@@ -25,7 +25,7 @@ float a_x, a_y, a_z;  //Accelerometer
 float g_x, g_y, g_z;  //Gyroscope
 float m_x, m_y, m_z;  //Magnetometer
 
-String sensData;
+String sensData;      //Buffer to hold sensor data before writing to SD
 /*----------------------------------------------------------------------------------------------------*/
 
 void setup() {
@@ -68,21 +68,14 @@ void setup() {
 
 
 void loop() {
-/*
-  
-  // Read sensor to variables
-  IMU.readAcceleration(a_x, a_y, a_z);
-  IMU.readGyroscope(g_x, g_y, g_z);
-  IMU.readMagneticField(m_x, m_y, m_z);
-
-  float samp_vec[] = {a_x, a_y, a_z, g_x, g_y, g_z, m_x, m_y, m_z}; //store all values in array
-
-  */
+  for(int i=0; i<10; i++){ //This is just to limit how much data is being written for testing purposes
+    writeSD();  //this function calls the sensorRead to write data to file
+  }
+  while(1); // trap to prevent multiple looping
 }
 
-
 // Functions
-/*---------------------------------------------*/
+/*--------------------------------------------------------------------------------------------*/
 void initSD(){
   SerialUSB.print("INITIALIZING SD CARD...");
   if(!SD.begin(CS_PIN)){
@@ -97,9 +90,11 @@ void clearSD(){
   SerialUSB.print("Clearing Stored Data...");
   if(SD.exists("test.txt")){  //remove SD test file - can delete later
     SD.remove("test.txt");
+    SerialUSB.println("test.txt removed");
   }
   if(SD.exists("DATA.txt")){
     SD.remove("DATA.txt");
+    SerialUSB.println("data.txt removed");
   }
 }
 
@@ -107,10 +102,10 @@ void clearSD(){
 void writeSD(){
   myFile = SD.open("DATA.txt",FILE_WRITE);
   if(myFile){
-    SerialUSB.print("Writing to DATA.txt");
+    SerialUSB.print("Writing to DATA.txt...");
     myFile.println(sensorRead());
     myFile.close();
-    SerialUSB.print("Done");
+    SerialUSB.println("Done");
   }
   else{
     SerialUSB.print("Error opening DATA.txt");
@@ -141,7 +136,7 @@ String sensorRead(){
   IMU.readGyroscope(g_x, g_y, g_z);
   IMU.readMagneticField(m_x, m_y, m_z);
   
-//convert float data to string, 3 decimal places
+//convert float data to string, 3 decimal places // 3 decimal places is arbitrary, change to appropriate rounding
   String ax = String(a_x,3);
   String ay = String(a_y,3);
   String az = String(a_z,3);
