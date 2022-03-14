@@ -23,13 +23,12 @@ const int CS_PIN = 10;			// Chip select pin for SD card (D10)
 unsigned long START_TIME;
 
 File myFile;					// Data file for storing sensor measures
-String sensData;				//Buffer to hold sensor data before writing to SD
 /*----------------------------------------------------------------------------------------------------*/
 // Definitions And Variables From Other Classes
 #define LSM9DS1_ADDRESS			0x6b
 #define LSM9DS1_CTRL_REG6_XL	0x20
 #define LSM9DS1_ADDRESS_M		0x1e
-#define LSM9DS1_CTRL_REG2_M		0x21
+#define LSM9DS1_CTRL_REG1_M		0x20
 
 TwoWire* _wire = &Wire1;
 /*----------------------------------------------------------------------------------------------------*/
@@ -44,7 +43,7 @@ void setup() {
 		while (1);
 	}
 	writeRegister(LSM9DS1_ADDRESS, LSM9DS1_CTRL_REG6_XL, 0x68);		// overwrite IMU accelerometer setup to 16 g's (IMU will still report as if +/- 4 g range)
-	writeRegister(LSM9DS1_ADDRESS_M, LSM9DS1_CTRL_REG2_M, 0xE2);	// overwrite IMU magnetometer setup to 155 Hz (IMU will still report 20 Hz for sample rate)
+	writeRegister(LSM9DS1_ADDRESS_M, LSM9DS1_CTRL_REG1_M, 0xE2);	// overwrite IMU magnetometer setup to 155 Hz (IMU will still report 20 Hz for sample rate)
 	
 	Serial.print("Accelerometer sample rate = ");
 	Serial.print(IMU.accelerationSampleRate());
@@ -111,7 +110,7 @@ void writeSD(){
 	if(myFile){
 		byte buf[22];
 		SerialUSB.println("Writing to DATA.txt...");
-		for(int i = 0; i < 10; i ++) {
+		for(int i = 0; i < 1000; i ++) {
 			sensorRead(buf);
 			myFile.write(buf, 22);
 		}
@@ -129,8 +128,10 @@ void readSD(){
 	if (myFile) {
 		Serial.println("DATA.txt:");
 		// read from the file until there's nothing else in it:
+		char sbuf[4];
 		while (myFile.available()) {
-			Serial.print(myFile.read());
+			sprintf(sbuf, "%02X", myFile.read());
+			Serial.print(sbuf);
 			//Serial.print(" ");
 		}
 		myFile.close();
@@ -140,91 +141,127 @@ void readSD(){
 }
 
 void sensorRead(byte buff[22]){
-	float a_x, a_y, a_z;	// Accelerometer
-	float g_x, g_y, g_z;	// Gyroscope
-	float m_x, m_y, m_z;	// Magnetometer
+	static float a_x, a_y, a_z;	// Accelerometer
+	static float g_x, g_y, g_z;	// Gyroscope
+	static float m_x, m_y, m_z;	// Magnetometer
 
 	// read sensor data to variables
 	IMU.readAcceleration(a_x, a_y, a_z);
 	IMU.readGyroscope(g_x, g_y, g_z);
 	IMU.readMagneticField(m_x, m_y, m_z);
 	
+	//Serial.print("Converted: ");
+	//char sbuf[16];
+	
 	// convert millis time to bytes
 	unsigned long t = millis() - START_TIME;
 	for(int i = 0; i < 4; i ++) {
-		buff[3-i] = (byte) ((t>>(i*8))&&0xFF);
+		buff[3-i] = (byte) ((t>>(i*8))&0xFF);
 	}
+	//sprintf(sbuf, "%04X%04X; ", (unsigned int) (t>>16)&0xFFFF, (unsigned int)t&0xFFFF);
+	//Serial.print(sbuf);
 	
 	//convert float data to binary according to the SRS
 	
 	// accelerometer x
 	int ax = (int) (a_x*4 * 2048);
 	for(int i = 0; i < 2; i ++) {
-		buff[5-i] = (byte) ((ax>>(i*8))&&0xFF);
+		buff[5-i] = (byte) ((ax>>(i*8))&0xFF);
 	}
+	//sprintf(sbuf, "%04X, ", ax&0xFFFF);
+	//Serial.print(sbuf);
+	
 	// accelerometer y
 	int ay = (int) (a_y*4 * 2048);
 	for(int i = 0; i < 2; i ++) {
-		buff[7-i] = (byte) ((ay>>(i*8))&&0xFF);
+		buff[7-i] = (byte) ((ay>>(i*8))&0xFF);
 	}
+	//sprintf(sbuf, "%04X, ", ay&0xFFFF);
+	//Serial.print(sbuf);
+	
 	// accelerometer z
 	int az = (int) (a_z*4 * 2048);
 	for(int i = 0; i < 2; i ++) {
-		buff[9-i] = (byte) ((az>>(i*8))&&0xFF);
+		buff[9-i] = (byte) ((az>>(i*8))&0xFF);
 	}
+	//sprintf(sbuf, "%04X, ", az&0xFFFF);
+	//Serial.print(sbuf);
 	
 	// gyroscope x
 	int gx = (int) (g_x * 16);
 	for(int i = 0; i < 2; i ++) {
-		buff[11-i] = (byte) ((gx>>(i*8))&&0xFF);
+		buff[11-i] = (byte) ((gx>>(i*8))&0xFF);
 	}
+	//sprintf(sbuf, "%04X, ", gx&0xFFFF);
+	//Serial.print(sbuf);
+	
 	// gyroscope y
 	int gy = (int) (g_y * 16);
 	for(int i = 0; i < 2; i ++) {
-		buff[13-i] = (byte) ((gy>>(i*8))&&0xFF);
+		buff[13-i] = (byte) ((gy>>(i*8))&0xFF);
 	}
+	//sprintf(sbuf, "%04X, ", gy&0xFFFF);
+	//Serial.print(sbuf);
+	
 	// gyroscope z
 	int gz = (int) (g_z * 16);
 	for(int i = 0; i < 2; i ++) {
-		buff[15-i] = (byte) ((gz>>(i*8))&&0xFF);
+		buff[15-i] = (byte) ((gz>>(i*8))&0xFF);
 	}
+	//sprintf(sbuf, "%04X, ", gz&0xFFFF);
+	//Serial.print(sbuf);
 	
 	// magnetometer x
 	int mx = (int) (m_x/100 * 8192);
 	for(int i = 0; i < 2; i ++) {
-		buff[17-i] = (byte) ((mx>>(i*8))&&0xFF);
+		buff[17-i] = (byte) ((mx>>(i*8))&0xFF);
 	}
+	//sprintf(sbuf, "%04X, ", mx&0xFFFF);
+	//Serial.print(sbuf);
+	
 	// magnetometer y
 	int my = (int) (m_y/100 * 8192);
 	for(int i = 0; i < 2; i ++) {
-		buff[19-i] = (byte) ((my>>(i*8))&&0xFF);
+		buff[19-i] = (byte) ((my>>(i*8))&0xFF);
 	}
+	//sprintf(sbuf, "%04X, ", my&0xFFFF);
+	//Serial.print(sbuf);
+	
 	// magnetometer z
 	int mz = (int) (m_z/100 * 8192);
 	for(int i = 0; i < 2; i ++) {
-		buff[21-i] = (byte) ((mz>>(i*8))&&0xFF);
+		buff[21-i] = (byte) ((mz>>(i*8))&0xFF);
 	}
+	//sprintf(sbuf, "%04X", mz&0xFFFF);
+	//Serial.println(sbuf);
 	
-	sensData = String(a_x,3)+", "+String(a_y,3)+", "+String(a_z,3)+", "+String(g_x,3)+", "+String(g_y,3)+", "+String(g_z,3)+", "+String(m_x,3)+", "+String(m_y,3)+", "+String(m_z,3);
-	//return sensData;
+	// Serial.print("Stored: ");
+	// for(int i = 0; i < 22; i ++) {
+		// sprintf(sbuf, "%02X", buff[i]);
+		// Serial.print(sbuf);
+	// }
+	// Serial.println();
 	
-	Serial.print(a_x*4);
-	Serial.print('\t');
-	Serial.print(a_y*4);
-	Serial.print('\t');
-	Serial.print(a_z*4);
-	Serial.print('\t');
-	Serial.print(g_x);
-	Serial.print('\t');
-	Serial.print(g_y);
-	Serial.print('\t');
-	Serial.print(g_z);
-	Serial.print('\t');
-	Serial.print(m_x);
-	Serial.print('\t');
-	Serial.print(m_y);
-	Serial.print('\t');
-	Serial.println(m_z);
+	// Serial.print("Actual: ");
+	// Serial.print(t);
+	// Serial.print("; ");
+	// Serial.print(a_x*4, 4);
+	// Serial.print('\t');
+	// Serial.print(a_y*4, 4);
+	// Serial.print('\t');
+	// Serial.print(a_z*4, 4);
+	// Serial.print('\t');
+	// Serial.print(g_x, 4);
+	// Serial.print('\t');
+	// Serial.print(g_y, 4);
+	// Serial.print('\t');
+	// Serial.print(g_z, 4);
+	// Serial.print('\t');
+	// Serial.print(m_x/100, 6);
+	// Serial.print('\t');
+	// Serial.print(m_y/100, 6);
+	// Serial.print('\t');
+	// Serial.println(m_z/100, 6);
 }
 
 // Modified Functions From Other Classes
